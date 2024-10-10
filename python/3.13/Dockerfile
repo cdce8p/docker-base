@@ -36,22 +36,23 @@ RUN set -ex \
     \
     && apk add --no-cache --virtual .build-deps  \
         patch \
+        gnupg \
+        tar \
+        xz \
+        \
         bzip2-dev \
-        coreutils \
         dpkg-dev dpkg \
         expat-dev \
         findutils \
-        build-base \
+        gcc \
         gdbm-dev \
         libc-dev \
         libffi-dev \
         libnsl-dev \
-        openssl \
         openssl-dev \
         libtirpc-dev \
         linux-headers \
         make \
-        mpdecimal-dev \
         ncurses-dev \
         pax-utils \
         readline-dev \
@@ -59,6 +60,7 @@ RUN set -ex \
         tcl-dev \
         tk \
         tk-dev \
+        util-linux-dev \
         xz-dev \
         zlib-dev \
         bluez-dev \
@@ -76,7 +78,7 @@ RUN set -ex \
         --enable-option-checking=fatal \
         --enable-shared \
         --with-lto \
-        --with-system-libmpdec \
+        # --with-system-libmpdec \
         --with-system-expat \
         --without-ensurepip \
         --without-static-libpython \
