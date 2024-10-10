@@ -293,4 +293,4 @@ jobs:
             --release ${{ needs.init.outputs.release }} \
             --version-from ${{ matrix.version }} \
             --version ${{ matrix.python }} \
-            --base alpine:3.20
+            --base ${{ matrix.python }}-alpine${{ matrix.version }}
