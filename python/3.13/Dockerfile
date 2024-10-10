@@ -16,6 +16,20 @@ SHELL ["/bin/ash", "-o", "pipefail", "-c"]
 COPY *.patch /usr/src/
 RUN set -ex \
     && export PYTHON_VERSION=${PYTHON_VERSION} \
+    && apk add --no-cache \
+        bash \
+        bind-tools \
+        ca-certificates \
+        curl \
+        jq \
+        libstdc++ \
+        tzdata \
+        xz \
+    \
+    && apk add --no-cache --virtual .build-deps \
+        build-base \
+        autoconf \
+        git \
     && apk add --no-cache --virtual .fetch-deps \
         gnupg \
         openssl \
@@ -36,9 +50,6 @@ RUN set -ex \
     \
     && apk add --no-cache --virtual .build-deps  \
         patch \
-        gnupg \
-        tar \
-        xz \
         \
         bzip2-dev \
         dpkg-dev dpkg \
