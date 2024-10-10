@@ -93,14 +93,16 @@ RUN set -ex \
         # --with-system-libmpdec \
         --with-system-expat \
         --without-ensurepip \
-        # --without-static-libpython \
+    ; \
+    # --without-static-libpython \
     # && make -j "$(nproc)" \
-        # LDFLAGS="-Wl,--strip-all" \
-        # CFLAGS="-fno-semantic-interposition -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free" \
-# set thread stack size to 1MB so we don't segfault before we hit sys.getrecursionlimit()
-# https://github.com/alpinelinux/aports/commit/2026e1259422d4e0cf92391ca2d3844356c649d0
-        EXTRA_CFLAGS="-DTHREAD_STACK_SIZE=0x100000" \
-        LDFLAGS="${LDFLAGS:--Wl},--strip-all"; \
+    # LDFLAGS="-Wl,--strip-all" \
+    # CFLAGS="-fno-semantic-interposition -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free" \
+    # set thread stack size to 1MB so we don't segfault before we hit sys.getrecursionlimit()
+    # https://github.com/alpinelinux/aports/commit/2026e1259422d4e0cf92391ca2d3844356c649d0
+    && nproc="$(nproc)"; \
+    && EXTRA_CFLAGS="-DTHREAD_STACK_SIZE=0x100000"; \
+    && LDFLAGS="${LDFLAGS:--Wl},--strip-all"; \
     && make -j "$nproc" \
         "EXTRA_CFLAGS=${EXTRA_CFLAGS:-}" \
         "LDFLAGS=${LDFLAGS:-}" \
