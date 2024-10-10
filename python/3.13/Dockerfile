@@ -1,19 +1,13 @@
-ARG BUILD_FROM
-FROM $BUILD_FROM
-
-ARG \
-    PYTHON_VERSION \
-    PIP_VERSION \
-    GPG_KEY \
-    QEMU_CPU
+FROM alpine:3.20
 
 # ensure local python is preferred over distribution python
 ENV PATH /usr/local/bin:$PATH
+ENV GPG_KEY 7169605F62C751356D054A26A821E680E5FA6305
+ENV PYTHON_VERSION 3.13.0
 
 # Set shell
 SHELL ["/bin/ash", "-o", "pipefail", "-c"]
 
-COPY *.patch /usr/src/
 RUN set -ex \
     && export PYTHON_VERSION=${PYTHON_VERSION} \
     && apk add --no-cache --virtual .fetch-deps \
@@ -21,6 +15,9 @@ RUN set -ex \
         openssl \
         tar \
         xz \
+        curl \
+        ca-certificates \
+        tzdata \
     \
     && curl -L -o python.tar.xz "https://www.python.org/ftp/python/${PYTHON_VERSION%%[a-z]*}/Python-$PYTHON_VERSION.tar.xz" \
     && curl -L -o python.tar.xz.asc "https://www.python.org/ftp/python/${PYTHON_VERSION%%[a-z]*}/Python-$PYTHON_VERSION.tar.xz.asc" \
@@ -64,9 +61,11 @@ RUN set -ex \
         bluez-dev \
     # add build deps before removing fetch deps in case there's overlap
     && apk del .fetch-deps \
-    \
-    && for i in /usr/src/*.patch; do \
-        patch -d /usr/src/python -p 1 < "${i}"; done \
+    ;
+
+RUN set -eux \
+    # && for i in /usr/src/*.patch; do \
+    #     patch -d /usr/src/python -p 1 < "${i}"; done \
     && cd /usr/src/python \
     && gnuArch="$(dpkg-architecture --query DEB_BUILD_GNU_TYPE)" \
     && ./configure \
@@ -80,52 +79,20 @@ RUN set -ex \
         --with-system-expat \
         --without-ensurepip \
         --without-static-libpython \
-    && make -j "$(nproc)" \
-        LDFLAGS="-Wl,--strip-all" \
-        CFLAGS="-fno-semantic-interposition -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free" \
+	; \
+	nproc="$(nproc)"; \
+	EXTRA_CFLAGS="-DTHREAD_STACK_SIZE=0x100000"; \
+	LDFLAGS="${LDFLAGS:--Wl},--strip-all"; \
+	make -j "$nproc" \
+		"EXTRA_CFLAGS=${EXTRA_CFLAGS:-}" \
+		"LDFLAGS=${LDFLAGS:-}" \
+		"PROFILE_TASK=${PROFILE_TASK:-}" \
+	;
+    # make -j "$(nproc)" \
+        # LDFLAGS="-Wl,--strip-all" \
+#         CFLAGS="-fno-semantic-interposition -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free" \
 # set thread stack size to 1MB so we don't segfault before we hit sys.getrecursionlimit()
 # https://github.com/alpinelinux/aports/commit/2026e1259422d4e0cf92391ca2d3844356c649d0
-        EXTRA_CFLAGS="-DTHREAD_STACK_SIZE=0x100000" \
-    && make install \
-    \
-	&& find /usr/local -type f -executable -not \( -name '*tkinter*' \) -exec scanelf --needed --nobanner --format '%n#p' '{}' ';' \
-		| tr ',' '\n' \
-		| sort -u \
-		| awk 'system("[ -e /usr/local/lib/" $1 " ]") == 0 { next } { print "so:" $1 }' \
-		| xargs -rt apk add --no-cache --virtual .python-rundeps \
-	&& apk del .build-deps \
-	\
-    && find /usr/local -depth \
-        \( \
-            -type d -a \( -name test -o -name tests \) \
-        \) -exec rm -rf '{}' + \
-    && rm -rf /usr/src/python \
-    && rm -f /usr/src/*.patch
+        # EXTRA_CFLAGS="-DTHREAD_STACK_SIZE=0x100000"
 
-# make some useful symlinks that are expected to exist
-RUN cd /usr/local/bin \
-    && ln -s idle3 idle \
-    && ln -s pydoc3 pydoc \
-    && ln -s python3 python \
-    && ln -s python3-config python-config
-
-RUN set -ex; \
-    \
-    apk add --no-cache --virtual .fetch-deps openssl; \
-    \
-    curl -L -o get-pip.py 'https://bootstrap.pypa.io/get-pip.py'; \
-    \
-    apk del .fetch-deps; \
-    \
-    python get-pip.py \
-        --disable-pip-version-check \
-        --no-cache-dir \
-        pip==${PIP_VERSION} \
-    ; \
-    pip --version; \
-    \
-    find /usr/local -depth \
-        \( \
-            -type d -a \( -name test -o -name tests \) \
-        \) -exec rm -rf '{}' +; \
-    rm -f get-pip.py
+CMD ["python3"]
