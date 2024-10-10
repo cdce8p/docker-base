@@ -92,7 +92,7 @@ RUN set -ex \
         # --with-system-libmpdec \
         --with-system-expat \
         --without-ensurepip \
-        --without-static-libpython \
+        # --without-static-libpython \
     && make -j "$(nproc)" \
         LDFLAGS="-Wl,--strip-all" \
         CFLAGS="-fno-semantic-interposition -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free" \
