@@ -86,6 +86,7 @@ RUN set -eux \
 	make -j "$nproc" \
 		"EXTRA_CFLAGS=${EXTRA_CFLAGS:-}" \
 		"LDFLAGS=${LDFLAGS:-}" \
+        "CFLAGS=${CFLAGS:--fno-semantic-interposition -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free}" \
 		"PROFILE_TASK=${PROFILE_TASK:-}" \
 	;
     # make -j "$(nproc)" \
