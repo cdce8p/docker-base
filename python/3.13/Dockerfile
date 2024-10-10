@@ -78,10 +78,11 @@ RUN set -ex \
     # add build deps before removing fetch deps in case there's overlap
     && apk del .fetch-deps \
     \
-    && for i in /usr/src/*.patch; do \
-        patch -d /usr/src/python -p 1 < "${i}"; done \
+    # && for i in /usr/src/*.patch; do \
+    #     patch -d /usr/src/python -p 1 < "${i}"; done \
     && cd /usr/src/python \
     && gnuArch="$(dpkg-architecture --query DEB_BUILD_GNU_TYPE)" \
+    && echo "${gnuArch}" \
     && ./configure \
         --build="$gnuArch" \
         --enable-loadable-sqlite-extensions \
@@ -93,13 +94,19 @@ RUN set -ex \
         --with-system-expat \
         --without-ensurepip \
         # --without-static-libpython \
-    && make -j "$(nproc)" \
-        LDFLAGS="-Wl,--strip-all" \
+    # && make -j "$(nproc)" \
+        # LDFLAGS="-Wl,--strip-all" \
         # CFLAGS="-fno-semantic-interposition -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free" \
 # set thread stack size to 1MB so we don't segfault before we hit sys.getrecursionlimit()
 # https://github.com/alpinelinux/aports/commit/2026e1259422d4e0cf92391ca2d3844356c649d0
         EXTRA_CFLAGS="-DTHREAD_STACK_SIZE=0x100000" \
-    && make install \
+        LDFLAGS="${LDFLAGS:--Wl},--strip-all"; \
+    && make -j "$nproc" \
+        "EXTRA_CFLAGS=${EXTRA_CFLAGS:-}" \
+        "LDFLAGS=${LDFLAGS:-}" \
+	;
+
+RUN make install \
     \
 	&& find /usr/local -type f -executable -not \( -name '*tkinter*' \) -exec scanelf --needed --nobanner --format '%n#p' '{}' ';' \
 		| tr ',' '\n' \
@@ -110,7 +117,8 @@ RUN set -ex \
 	\
     && find /usr/local -depth \
         \( \
-            -type d -a \( -name test -o -name tests \) \
+            \( -type d -a \( -name test -o -name tests -o -name idle_test \) \) \
+            -o \( -type f -a \( -name '*.pyc' -o -name '*.pyo' -o -name 'libpython*.a' \) \) \
         \) -exec rm -rf '{}' + \
     && rm -rf /usr/src/python \
     && rm -f /usr/src/*.patch
