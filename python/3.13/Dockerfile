@@ -1,97 +1,132 @@
+#
+# NOTE: THIS DOCKERFILE IS GENERATED VIA "apply-templates.sh"
+#
+# PLEASE DO NOT EDIT IT DIRECTLY.
+#
+
 FROM alpine:3.20
 
 # ensure local python is preferred over distribution python
 ENV PATH /usr/local/bin:$PATH
+
+# runtime dependencies
+RUN set -eux; \
+	apk add --no-cache \
+		ca-certificates \
+		tzdata \
+	;
+
 ENV GPG_KEY 7169605F62C751356D054A26A821E680E5FA6305
 ENV PYTHON_VERSION 3.13.0
 
-# Set shell
-SHELL ["/bin/ash", "-o", "pipefail", "-c"]
+RUN echo "PROFILE_TASK=${PROFILE_TASK}"
 
-RUN set -ex \
-    && export PYTHON_VERSION=${PYTHON_VERSION} \
-    && apk add --no-cache --virtual .fetch-deps \
-        gnupg \
-        openssl \
-        tar \
-        xz \
-        curl \
-        ca-certificates \
-        tzdata \
-    \
-    && curl -L -o python.tar.xz "https://www.python.org/ftp/python/${PYTHON_VERSION%%[a-z]*}/Python-$PYTHON_VERSION.tar.xz" \
-    && curl -L -o python.tar.xz.asc "https://www.python.org/ftp/python/${PYTHON_VERSION%%[a-z]*}/Python-$PYTHON_VERSION.tar.xz.asc" \
-    && export GNUPGHOME="$(mktemp -d)" \
-    && echo "disable-ipv6" >> "$GNUPGHOME/dirmngr.conf" \
-    && gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys "${GPG_KEY}" \
-    && gpg --batch --verify python.tar.xz.asc python.tar.xz \
-    && { command -v gpgconf > /dev/null && gpgconf --kill all || :; } \
-    && rm -rf "$GNUPGHOME" python.tar.xz.asc \
-    && mkdir -p /usr/src/python \
-    && tar -xJC /usr/src/python --strip-components=1 -f python.tar.xz \
-    && rm python.tar.xz \
-    \
-    && apk add --no-cache --virtual .build-deps  \
-        patch \
-        bzip2-dev \
-        coreutils \
-        dpkg-dev dpkg \
-        expat-dev \
-        findutils \
-        build-base \
-        gdbm-dev \
-        libc-dev \
-        libffi-dev \
-        libnsl-dev \
-        openssl \
-        openssl-dev \
-        libtirpc-dev \
-        linux-headers \
-        make \
-        mpdecimal-dev \
-        ncurses-dev \
-        pax-utils \
-        readline-dev \
-        sqlite-dev \
-        tcl-dev \
-        tk \
-        tk-dev \
-        xz-dev \
-        zlib-dev \
-        bluez-dev \
-    # add build deps before removing fetch deps in case there's overlap
-    && apk del .fetch-deps \
-    ;
-
-RUN set -eux \
-    # && for i in /usr/src/*.patch; do \
-    #     patch -d /usr/src/python -p 1 < "${i}"; done \
-    && cd /usr/src/python \
-    && gnuArch="$(dpkg-architecture --query DEB_BUILD_GNU_TYPE)" \
-    && ./configure \
-        --build="$gnuArch" \
-        --enable-loadable-sqlite-extensions \
-        --enable-optimizations \
-        --enable-option-checking=fatal \
-        --enable-shared \
-        --with-lto \
-        --with-system-libmpdec \
-        --with-system-expat \
-        --without-ensurepip \
-        --without-static-libpython \
+RUN set -eux; \
+	\
+	apk add --no-cache --virtual .build-deps \
+		gnupg \
+		tar \
+		xz \
+		\
+		bluez-dev \
+		bzip2-dev \
+		dpkg-dev dpkg \
+		expat-dev \
+		findutils \
+		gcc \
+		gdbm-dev \
+		libc-dev \
+		libffi-dev \
+		libnsl-dev \
+		libtirpc-dev \
+		linux-headers \
+		make \
+		ncurses-dev \
+		openssl-dev \
+		pax-utils \
+		readline-dev \
+		sqlite-dev \
+		tcl-dev \
+		tk \
+		tk-dev \
+		util-linux-dev \
+		xz-dev \
+		zlib-dev \
+	; \
+	\
+	wget -O python.tar.xz "https://www.python.org/ftp/python/${PYTHON_VERSION%%[a-z]*}/Python-$PYTHON_VERSION.tar.xz"; \
+	wget -O python.tar.xz.asc "https://www.python.org/ftp/python/${PYTHON_VERSION%%[a-z]*}/Python-$PYTHON_VERSION.tar.xz.asc"; \
+	GNUPGHOME="$(mktemp -d)"; export GNUPGHOME; \
+	gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys "$GPG_KEY"; \
+	gpg --batch --verify python.tar.xz.asc python.tar.xz; \
+	gpgconf --kill all; \
+	rm -rf "$GNUPGHOME" python.tar.xz.asc; \
+	mkdir -p /usr/src/python; \
+	tar --extract --directory /usr/src/python --strip-components=1 --file python.tar.xz; \
+	rm python.tar.xz; \
+	\
+	cd /usr/src/python; \
+	gnuArch="$(dpkg-architecture --query DEB_BUILD_GNU_TYPE)"; \
+	./configure \
+		--build="$gnuArch" \
+		--enable-loadable-sqlite-extensions \
+		$(test "$gnuArch" != 'riscv64-linux-musl' && echo '--enable-optimizations') \
+		--enable-option-checking=fatal \
+		--enable-shared \
+		--with-lto \
+		--with-system-expat \
+		--with-ensurepip \
 	; \
 	nproc="$(nproc)"; \
+# set thread stack size to 1MB so we don't segfault before we hit sys.getrecursionlimit()
+# https://github.com/alpinelinux/aports/commit/2026e1259422d4e0cf92391ca2d3844356c649d0
 	EXTRA_CFLAGS="-DTHREAD_STACK_SIZE=0x100000"; \
 	LDFLAGS="${LDFLAGS:--Wl},--strip-all"; \
 	make -j "$nproc" \
 		"EXTRA_CFLAGS=${EXTRA_CFLAGS:-}" \
 		"LDFLAGS=${LDFLAGS:-}" \
-	;
-    # make -j "$(nproc)" \
-        # LDFLAGS="-Wl,--strip-all" \
-#         CFLAGS="-fno-semantic-interposition -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free" \
-# set thread stack size to 1MB so we don't segfault before we hit sys.getrecursionlimit()
-# https://github.com/alpinelinux/aports/commit/2026e1259422d4e0cf92391ca2d3844356c649d0
-        # EXTRA_CFLAGS="-DTHREAD_STACK_SIZE=0x100000"
+		"PROFILE_TASK=${PROFILE_TASK:-}" \
+	; \
+# https://github.com/docker-library/python/issues/784
+# prevent accidental usage of a system installed libpython of the same version
+	rm python; \
+	make -j "$nproc" \
+		"EXTRA_CFLAGS=${EXTRA_CFLAGS:-}" \
+		"LDFLAGS=${LDFLAGS:--Wl},-rpath='\$\$ORIGIN/../lib'" \
+		"PROFILE_TASK=${PROFILE_TASK:-}" \
+		python \
+	; \
+	make install; \
+	\
+	cd /; \
+	rm -rf /usr/src/python; \
+	\
+	find /usr/local -depth \
+		\( \
+			\( -type d -a \( -name test -o -name tests -o -name idle_test \) \) \
+			-o \( -type f -a \( -name '*.pyc' -o -name '*.pyo' -o -name 'libpython*.a' \) \) \
+		\) -exec rm -rf '{}' + \
+	; \
+	\
+	find /usr/local -type f -executable -not \( -name '*tkinter*' \) -exec scanelf --needed --nobanner --format '%n#p' '{}' ';' \
+		| tr ',' '\n' \
+		| sort -u \
+		| awk 'system("[ -e /usr/local/lib/" $1 " ]") == 0 { next } { print "so:" $1 }' \
+		| xargs -rt apk add --no-network --virtual .python-rundeps \
+	; \
+	apk del --no-network .build-deps; \
+	\
+	export PYTHONDONTWRITEBYTECODE=1; \
+	python3 --version; \
+	pip3 --version
+
+# make some useful symlinks that are expected to exist ("/usr/local/bin/python" and friends)
+RUN set -eux; \
+	for src in idle3 pip3 pydoc3 python3 python3-config; do \
+		dst="$(echo "$src" | tr -d 3)"; \
+		[ -s "/usr/local/bin/$src" ]; \
+		[ ! -e "/usr/local/bin/$dst" ]; \
+		ln -svT "$src" "/usr/local/bin/$dst"; \
+	done
 
 CMD ["python3"]
