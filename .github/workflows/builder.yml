@@ -1,6 +1,7 @@
 name: Build base images
 
 on:
+  push:
   pull_request:
     branches: ["master"]
   release:
@@ -108,6 +109,7 @@ jobs:
     name: Build ${{ matrix.arch }} debian ${{ matrix.version }} base image
     needs: init
     runs-on: ubuntu-latest
+    if: false
     permissions:
       contents: read
       id-token: write
@@ -153,6 +155,7 @@ jobs:
     name: Build ${{ matrix.arch }} ubuntu ${{ matrix.version }} base image
     needs: init
     runs-on: ubuntu-latest
+    if: false
     permissions:
       contents: read
       id-token: write
@@ -197,6 +200,7 @@ jobs:
     name: Build ${{ matrix.arch }} raspbian ${{ matrix.version }} base image
     needs: init
     runs-on: ubuntu-latest
+    if: false
     permissions:
       contents: read
       id-token: write
@@ -249,7 +253,7 @@ jobs:
     strategy:
       matrix:
         arch: ${{ fromJson(needs.init.outputs.architectures_alpine) }}
-        version: ["3.18", "3.19", "3.20"]
+        version: ["3.20"]
         python: ["3.11", "3.12", "3.13"]
     steps:
       - name: Checkout the repository
